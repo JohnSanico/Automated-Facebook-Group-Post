@@ -10,19 +10,24 @@ export async function switchProfile(page: Page, profileName: string): Promise<vo
   try {
     // Click the main profile icon (top-right)
     // Playwright has a handy locator for the profile picture in the header
+    console.info('Clicking the main profile icon...');
     const profileIcon = page.locator('[aria-label="Your profile"]').first();
     await profileIcon.click({ timeout: 5_000 });
+    console.info('The main profile icon has been clicked...');
+
 
     // Look for "See all profiles" and click if present
-    const seeAllProfiles = page.getByText('See all profiles');
-    if (await seeAllProfiles.isVisible({ timeout: 3_000 }).catch(() => false)) {
-      await seeAllProfiles.click();
-    }
+    console.info('Clicking the See all profile icon...');
+    const seeAllProfiles = page.locator('[aria-label="See all profiles"]');
+    await seeAllProfiles.click({ timeout: 5_000});
+    console.info('The see all profile icon has been clicked...');
 
     // Click the target profile (exact text match on the second occurrence, as in the original)
+    console.info('Clicking the target profile...');
     const profileLocator = page.getByText(profileName, { exact: true }).nth(1);
     await profileLocator.waitFor({ state: 'visible', timeout: 20_000 });
     await profileLocator.click();
+    console.info('The see target profile has been clicked...');
 
     console.info(`✅ Successfully switched profile to ${profileName}.`);
     await page.waitForURL(FACEBOOK_HOME_URL, { timeout: 15_000 });
