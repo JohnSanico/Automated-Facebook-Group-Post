@@ -19,6 +19,7 @@ async function automateFacebookPosting(): Promise<void> {
 
   // Launch browser with the saved session – already logged in
   const { browser, context, page } = await launchBrowser(sessionPath);
+  console.info('Browser launching...');
 
   try {
     await page.goto(FACEBOOK_HOME_URL, { waitUntil: 'load', timeout: 40_000 });

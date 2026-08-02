@@ -10,7 +10,7 @@ export async function launchBrowser(sessionPath?: string): Promise<{
   browser: Browser;
   context: BrowserContext;
   page: Page;
-}> {
+  }> {
   const browser = await chromium.launch({
     channel: 'chrome',
     headless: false,

@@ -11,7 +11,7 @@ export async function switchProfile(page: Page, profileName: string): Promise<vo
     // Click the main profile icon (top-right)
     // Playwright has a handy locator for the profile picture in the header
     const profileIcon = page.locator('[aria-label="Your profile"]').first();
-    await profileIcon.click({ timeout: 10_000 });
+    await profileIcon.click({ timeout: 5_000 });
 
     // Look for "See all profiles" and click if present
     const seeAllProfiles = page.getByText('See all profiles');
