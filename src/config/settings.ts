@@ -8,11 +8,6 @@ export const FACEBOOK_HOME_URL = 'https://www.facebook.com/';
 export const TARGET_PROFILE_NAME = process.env.TARGET_PROFILE_NAME;
 export const GROUP_POST_MESSAGE = process.env.GROUP_POST_MESSAGE || '@Everyone';
 
-// --------------------------------------------------------------------
-// Remove the old GROUP_FILE_HEADER_LABELS and isHeaderLabel
-// They are no longer needed.
-// --------------------------------------------------------------------
-
 /**
  * Reads group names from an Excel/CSV file, selecting the column whose header
  * contains the target profile name (case‑insensitive).
@@ -56,8 +51,14 @@ function readGroupsFromFile(groupFilePathRaw: string, targetProfileName: string)
     process.exit(1);
   }
 
-  // First row is expected to be the header row
-  const headerRow = rows[0].map((cell) => String(cell ?? '').trim());
+  // Safely retrieve the first row (header row)
+  const headerRowRaw = rows[0];
+  if (!headerRowRaw) {
+    console.error('❌ GROUP_LIST_FILE has no header row.');
+    process.exit(1);
+  }
+
+  const headerRow = headerRowRaw.map((cell) => String(cell ?? '').trim());
   const targetLower = targetProfileName.toLowerCase();
 
   // Find the column index whose header includes the target profile name
@@ -78,7 +79,9 @@ function readGroupsFromFile(groupFilePathRaw: string, targetProfileName: string)
   // Extract group names from that column (skip header row)
   const groups: string[] = [];
   for (let i = 1; i < rows.length; i++) {
-    const cellValue = rows[i]?.[columnIndex];
+    const row = rows[i];
+    if (!row) continue;
+    const cellValue = row[columnIndex];
     const value = String(cellValue ?? '').trim();
     if (value.length > 0) {
       groups.push(value);
@@ -92,7 +95,7 @@ function readGroupsFromEnv(groupListRaw: string): string[] {
   return groupListRaw.split(',').map(g => g.trim()).filter(g => g.length > 0);
 }
 
-// Build posting tasks from environment variables
+// Build posting tasks from environment variables (keeps sensitive data out of source)
 function buildPostingTasks(): PostingTask[] {
   const sourceUrl = process.env.SOURCE_URL;
   const groupListRaw = process.env.GROUP_LIST;
