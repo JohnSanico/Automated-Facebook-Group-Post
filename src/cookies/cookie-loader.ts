@@ -1,9 +1,16 @@
 // cookies/cookie-loader.ts
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import type { BrowserContext } from 'playwright';   // only the type
-import type { Cookie } from '../types.js';
+import type { BrowserContext, Cookie } from 'playwright';
 import { COOKIE_FILE } from '../config/settings.js';
+
+function normalizeSameSite(value: unknown): 'Strict' | 'Lax' | 'None' {
+  const v = String(value ?? '').toLowerCase();
+  if (v === 'no_restriction' || v === 'none') return 'None';
+  if (v === 'strict') return 'Strict';
+  if (v === 'lax') return 'Lax';
+  return 'Lax';
+}
 
 export async function loadCookies(context: BrowserContext): Promise<boolean> {
   if (!existsSync(COOKIE_FILE)) {
@@ -16,26 +23,19 @@ export async function loadCookies(context: BrowserContext): Promise<boolean> {
     const raw = await readFile(COOKIE_FILE, 'utf-8');
     const parsed: unknown = JSON.parse(raw);
 
-    // It must be a non‑null object
     if (typeof parsed !== 'object' || parsed === null) {
       console.error('❌ Invalid cookie format: Expected an object or array.');
       return false;
     }
 
-    // Now treat it as a dictionary for easy property access
     const cookieObj = parsed as Record<string, unknown>;
     let cookies: unknown[];
 
-    // If it already looks like an array, use it directly
     if (Array.isArray(parsed)) {
       cookies = parsed;
-    }
-    // If there's a "cookies" wrapper property, use that
-    else if ('cookies' in cookieObj && Array.isArray(cookieObj.cookies)) {
+    } else if ('cookies' in cookieObj && Array.isArray(cookieObj.cookies)) {
       cookies = cookieObj.cookies;
-    }
-    // Otherwise, assume it's a flat object of { name: value } (e.g., { c_user: "...", xs: "..." })
-    else {
+    } else {
       cookies = Object.entries(cookieObj).map(([name, value]) => ({
         name,
         value,
@@ -44,13 +44,34 @@ export async function loadCookies(context: BrowserContext): Promise<boolean> {
       }));
     }
 
-    // Map each item to the minimal shape Playwright needs
-    const cookieList: Cookie[] = cookies.map((c: any) => ({
-      name: c.name,
-      value: c.value,
-      domain: c.domain ?? '.facebook.com',
-      path: c.path ?? '/',
-    }));
+    const cookieList: Cookie[] = cookies.map((rawCookie): Cookie => {
+      const c = rawCookie as Record<string, unknown>;
+
+      const domain =
+        typeof c.domain === 'string' && c.domain.length > 0
+          ? c.domain
+          : '.facebook.com';
+
+      const cookiePath =
+        typeof c.path === 'string' && c.path.length > 0 ? c.path : '/';
+
+      const expiresRaw = c.expires ?? c.expirationDate;
+      const expires =
+        typeof expiresRaw === 'number' && Number.isFinite(expiresRaw)
+          ? expiresRaw
+          : -1;
+
+      return {
+        name: String(c.name),
+        value: String(c.value),
+        domain,
+        path: cookiePath,
+        expires,
+        httpOnly: Boolean(c.httpOnly),
+        secure: typeof c.secure === 'boolean' ? c.secure : true,
+        sameSite: normalizeSameSite(c.sameSite),
+      };
+    });
 
     await context.addCookies(cookieList);
     console.info('🍪 Cookies loaded successfully into browser context.');
@@ -60,4 +81,4 @@ export async function loadCookies(context: BrowserContext): Promise<boolean> {
     console.error(`❌ Error loading cookies: ${message}`);
     return false;
   }
-} 
+}

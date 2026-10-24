@@ -1,3 +1,4 @@
+// File: core/browser.ts
 // src/core/browser.ts
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 

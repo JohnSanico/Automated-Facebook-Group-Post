@@ -1,3 +1,4 @@
+// File: profiles/profile-switcher.ts
 // profiles/profile-switcher.ts
 import type { Page } from 'playwright';
 import { FACEBOOK_HOME_URL } from '../config/settings.js';

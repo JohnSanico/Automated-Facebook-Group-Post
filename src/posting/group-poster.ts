@@ -1,3 +1,4 @@
+// File: posting/group-poster.ts
 // src/posting/group-poster.ts
 import type { Page } from 'playwright';
 
