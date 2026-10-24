@@ -6,6 +6,9 @@ jspm_packages/
 # We block the actual .env file because it contains your private paths
 .env
 
+# .xlsx, .csv, and other data files
+Facebook-Group.xlsx
+
 # Build outputs
 dist/
 out/
