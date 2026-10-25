@@ -21,11 +21,37 @@ export interface GroupConfig {
 }
 
 /**
- * Clean strings by trimming whitespace and removing UTF-8 Byte Order Marks (\ufeff).
+ * Clean strings by safely handling primitives, ExcelJS rich text objects, 
+ * formula results, and hyperlinks, while trimming whitespace and removing UTF-8 Byte Order Marks (\ufeff).
  */
 function cleanString(val: unknown): string {
-  if (typeof val !== 'string') return String(val ?? '').trim();
-  return val.replace(/^\ufeff/, '').trim();
+  if (val === null || val === undefined) {
+    return '';
+  }
+
+  // Handle ExcelJS complex object types
+  if (typeof val === 'object' && val !== null) {
+    // 1. Handle Rich Text arrays (e.g., multi-styled text in one cell)
+    if ('richText' in val && Array.isArray((val as { richText: unknown[] }).richText)) {
+      return (val as { richText: Array<{ text?: string }> }).richText
+        .map(rt => rt.text || '')
+        .join('')
+        .trim();
+    }
+
+    // 2. Handle Formula cells (extract the calculated result)
+    if ('result' in val) {
+      return cleanString((val as { result: unknown }).result);
+    }
+
+    // 3. Handle Hyperlink cells (extract the display text)
+    if ('text' in val) {
+      return cleanString((val as { text: unknown }).text);
+    }
+  }
+
+  // Fallback for standard strings/numbers
+  return String(val).replace(/^\ufeff/, '').trim();
 }
 
 /**
@@ -49,6 +75,13 @@ export async function loadGroupSettings(): Promise<GroupConfig[]> {
   const workbook = new ExcelJS.Workbook();
   const fileExtension = filePath.split('.').pop()?.toLowerCase();
 
+  // Explicitly reject legacy .xls binary format with a descriptive error
+  if (fileExtension === 'xls') {
+    throw new Error(
+      `❌ Legacy .xls format is not supported. Please open your spreadsheet and save it as an .xlsx or .csv file.`
+    );
+  }
+
   if (fileExtension === 'csv') {
     await workbook.csv.readFile(filePath);
   } else {
@@ -61,6 +94,7 @@ export async function loadGroupSettings(): Promise<GroupConfig[]> {
   }
 
   const groupConfigs: GroupConfig[] = [];
+  const seenGroups = new Set<string>(); // Tracks unique groups to prevent duplicate entries
 
   // Strategy 1: Columnar Layout (Column Header == process.env.TARGET_PROFILE_NAME)
   let directColumnIndex = -1;
@@ -83,7 +117,10 @@ export async function loadGroupSettings(): Promise<GroupConfig[]> {
       if (rowIndex <= directHeaderRowIndex) return;
 
       const groupName = cleanString(row.getCell(directColumnIndex).value);
-      if (groupName) {
+      const normalizedGroup = groupName.toLowerCase();
+
+      if (groupName && !seenGroups.has(normalizedGroup)) {
+        seenGroups.add(normalizedGroup);
         groupConfigs.push({
           profileName: TARGET_PROFILE_NAME,
           groupName,
@@ -91,7 +128,7 @@ export async function loadGroupSettings(): Promise<GroupConfig[]> {
       }
     });
 
-    console.info(`📋 Loaded ${groupConfigs.length} group(s) for profile "${TARGET_PROFILE_NAME}" (Columnar Layout)`);
+    console.info(`📋 Loaded ${groupConfigs.length} unique group(s) for profile "${TARGET_PROFILE_NAME}" (Columnar Layout)`);
     return groupConfigs;
   }
 
@@ -124,8 +161,10 @@ export async function loadGroupSettings(): Promise<GroupConfig[]> {
 
       const rawProfile = cleanString(row.getCell(profileColIndex).value);
       const rawGroup = cleanString(row.getCell(groupColIndex).value);
+      const normalizedGroup = rawGroup.toLowerCase();
 
-      if (rawProfile.toLowerCase() === targetProfile && rawGroup) {
+      if (rawProfile.toLowerCase() === targetProfile && rawGroup && !seenGroups.has(normalizedGroup)) {
+        seenGroups.add(normalizedGroup);
         groupConfigs.push({
           profileName: TARGET_PROFILE_NAME,
           groupName: rawGroup,
@@ -133,7 +172,7 @@ export async function loadGroupSettings(): Promise<GroupConfig[]> {
       }
     });
 
-    console.info(`📋 Loaded ${groupConfigs.length} group(s) for profile "${TARGET_PROFILE_NAME}" (Tabular Layout)`);
+    console.info(`📋 Loaded ${groupConfigs.length} unique group(s) for profile "${TARGET_PROFILE_NAME}" (Tabular Layout)`);
     return groupConfigs;
   }
 
