@@ -2,11 +2,29 @@
 // src/posting/group-poster.ts
 import type { Page } from 'playwright';
 
+/**
+ * Simulates human typing by entering characters one by one with randomized delays.
+ */
+async function typeHumanLike(
+  page: Page,
+  locator: ReturnType<Page['locator']>,
+  text: string,
+  minDelay = 70,
+  maxDelay = 160
+): Promise<void> {
+  await locator.click();
+  for (const char of text) {
+    await locator.press(char);
+    const randomDelay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+    await page.waitForTimeout(randomDelay);
+  }
+}
+
 export async function shareToGroup(
   page: Page,
   sourceUrl: string,
   groupName: string,
-  postMessage: string, // Available if you uncomment the message‑filling code below
+  postMessage: string,
 ): Promise<boolean> {
   console.info(`\n📢 Sharing post to group: ${groupName}`);
   await page.waitForTimeout(2_000);
@@ -25,18 +43,20 @@ export async function shareToGroup(
 
     const searchInput = page.locator('input[placeholder="Search for groups"]');
     await searchInput.waitFor({ state: 'visible', timeout: 10_000 });
-    await searchInput.fill(groupName);
-    console.info(`🔍 Searching group: ${groupName}`);
+    
+    // Replaced instant .fill() with human-like typing
+    console.info(`🔍 Searching group with human-like typing: ${groupName}`);
+    await typeHumanLike(page, searchInput, groupName, 80, 180);
 
     const groupButton = page.locator('div[role="button"]').filter({ hasText: groupName });
     await groupButton.click({ timeout: 10_000 });
     console.info(`✅ Selected group: ${groupName}`);
     await page.waitForTimeout(2_000);
 
-    // Uncomment to type a custom message before posting
+    // Uncomment and use typeHumanLike if you want to type the custom message human-like as well
     // const textArea = page.locator('.xzsf02u.x1a2a7pz.x1n2onr6.x14wi4xw.x9f619');
     // await textArea.waitFor({ state: 'visible', timeout: 10_000 });
-    // await textArea.fill(postMessage);
+    // await typeHumanLike(page, textArea, postMessage, 50, 130);
     // console.info('✏️ Filled post message.');
     // await page.waitForTimeout(2_000);
 
